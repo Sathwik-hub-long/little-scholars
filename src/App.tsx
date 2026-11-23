@@ -1597,7 +1597,7 @@ function App() {
                   </label>
                   <label>Class *
                     <select value={studentClass} onChange={e => changeClass(e.target.value)}>
-                      {['6th', '7th', '8th', '9th', '10th', 'Inter', 'Diploma'].map(c => <option key={c}>{c}</option>)}
+                    {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', 'Inter', 'Diploma','Btech'].map(c => <option key={c}>{c}</option>)}
                     </select>
                   </label>
                   <label>School / College Name *
