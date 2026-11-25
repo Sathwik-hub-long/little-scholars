@@ -1,0 +1,2 @@
+[functions.login-with-mobile]
+verify_jwt = false

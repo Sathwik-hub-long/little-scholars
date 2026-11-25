@@ -1,4 +1,6 @@
 
+// Loading library
+
 import { supabase } from './supabase'
 import { useEffect, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
@@ -407,7 +409,7 @@ function App() {
     }
   }, [])
 
-  // LOGIN
+  // LOGIN: email/password directly; mobile/password through a secure Edge Function
 
   async function handleLogin() {
     const username = loginUsername.trim()
@@ -422,7 +424,6 @@ function App() {
     setDataLoading(true)
 
     // TEMPORARY DEMO STUDENT LOGIN
-
     if (cleanedUsername.toUpperCase().startsWith('LS')) {
       const localStudent = getLocalStudents().find(
         student =>
@@ -440,13 +441,9 @@ function App() {
 
       if (matchedStudent) {
         setStudents(previous => {
-          const exists = previous.some(
-            student => student.id === matchedStudent.id
-          )
-
+          const exists = previous.some(student => student.id === matchedStudent.id)
           return exists ? previous : [...previous, matchedStudent]
         })
-
         setLoggedInStudentId(matchedStudent.id)
         setLoggedInParentName('')
         setLoginRole('student')
@@ -460,65 +457,76 @@ function App() {
     }
 
     try {
-      const isPhone = /^\+?\d{10,15}$/.test(cleanedUsername)
+      const isPhone = /^\+?[0-9]{10,15}$/.test(cleanedUsername)
+      let authUser: { id: string } | null = null
 
-      if (
-        isPhone &&
-        !cleanedUsername.startsWith('+') &&
-        !/^[6-9]\d{9}$/.test(cleanedUsername)
-      ) {
-        throw new Error('Please enter a valid Indian mobile number.')
+      if (isPhone) {
+        const digits = cleanedUsername.replace(/\D/g, '')
+        let formattedMobile = ''
+
+        if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) {
+          formattedMobile = `+91${digits}`
+        } else if (digits.length === 12 && digits.startsWith('91') && /^[6-9]\d{9}$/.test(digits.slice(2))) {
+          formattedMobile = `+${digits}`
+        } else {
+          throw new Error('Enter a valid 10-digit Indian mobile number.')
+        }
+
+        // This Edge Function finds the linked parent account on the server,
+        // checks the password with Supabase Auth, and returns a session.
+        const { data: mobileLogin, error: mobileLoginError } =
+          await supabase.functions.invoke('login-with-mobile', {
+            body: { mobile: formattedMobile, password: loginPassword },
+          })
+
+        if (mobileLoginError) throw mobileLoginError
+        if (!mobileLogin?.session) {
+          throw new Error(mobileLogin?.error || 'Mobile login failed. Please check your details.')
+        }
+
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.setSession(mobileLogin.session)
+
+        if (sessionError) throw sessionError
+        authUser = sessionData.user
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanedUsername.toLowerCase(),
+          password: loginPassword,
+        })
+
+        if (error) throw error
+        authUser = data.user
       }
 
-      const credentials = isPhone
-        ? {
-            phone: cleanedUsername.startsWith('+')
-              ? cleanedUsername
-              : `+91${cleanedUsername}`,
-            password: loginPassword,
-          }
-        : {
-            email: cleanedUsername.toLowerCase(),
-            password: loginPassword,
-          }
+      if (!authUser) throw new Error('Login failed. Please try again.')
 
-      const { data, error } =
-        await supabase.auth.signInWithPassword(credentials)
-
-      if (error) throw error
-
-      if (!data.user) {
-        throw new Error('Login failed. Please try again.')
-      }
-
-      const profile = await verifyUserRole(data.user.id)
+      const profile = await verifyUserRole(authUser.id)
 
       if (profile.role === 'admin') {
         await loadAdminData(true)
-
         setLoginRole('admin')
         setLoggedInStudentId(null)
         setLoggedInParentName('')
         setPage('Dashboard')
       } else if (profile.role === 'parent') {
         const child = await loadParentStudent()
-
         setStudents([child])
         setLoggedInStudentId(child.id)
         setLoggedInParentName(profile.full_name || 'Parent')
         setLoginRole('parent')
         setPage('Parent Portal')
+      } else {
+        throw new Error('This account does not have access.')
       }
 
       setLoginUsername('')
       setLoginPassword('')
     } catch (error) {
       console.error('Login error:', error)
-
       setLoginError(
         getErrorMessage(error, 'Login failed. Please check your details.')
       )
-
       await supabase.auth.signOut()
     } finally {
       setDataLoading(false)
@@ -2150,3 +2158,6 @@ function App() {
 }
 
 export default App
+
+
+
