@@ -1,6 +1,6 @@
 
 // Loading library
-
+import InstallApp from './InstallApp'
 import { supabase } from './supabase'
 import { useEffect, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
@@ -1315,6 +1315,7 @@ function App() {
             <strong>LEARN • GROW • SUCCEED</strong>
             <p>© 2026 Little Scholars</p>
           </div>
+          <InstallApp />
         </div>
       </div>
     )
@@ -1355,6 +1356,7 @@ function App() {
             Logout
           </button>
         </header>
+        <InstallApp />
 
         <section className="content-card portal-welcome">
           {loggedInStudent.photo ? (
@@ -1513,6 +1515,7 @@ function App() {
 
   return (
     <div className="app">
+      <InstallApp />
       <aside className="sidebar">
         <h2>📚 Little Scholars</h2>
         <p className="subtitle">Student Management System</p>
