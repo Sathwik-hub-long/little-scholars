@@ -312,28 +312,29 @@ function App() {
     return profile
   }
 
-  // LOAD ONLY THE STUDENT LINKED TO THE LOGGED-IN PARENT.
+ 
+  // LOAD ALL STUDENTS LINKED TO THE LOGGED-IN PARENT.
   // Supabase RLS must enforce this restriction.
 
-  async function loadParentStudent(): Promise<Student> {
+  async function loadParentStudents(): Promise<Student[]> {
     const { data, error } = await supabase
       .from('students')
       .select('*')
+      .order('id', { ascending: true })
 
     if (error) throw error
 
     const linkedStudents = (data ?? []) as DbStudent[]
 
-    if (linkedStudents.length !== 1) {
+    if (linkedStudents.length === 0) {
       throw new Error(
-        linkedStudents.length === 0
-          ? 'No student is linked to this parent account.'
-          : 'Multiple linked students found. Contact the administrator.'
+        'No students are linked to this parent account. Please contact your administrator.'
       )
     }
 
-    return fromDatabase(linkedStudents[0])
+    return linkedStudents.map(fromDatabase)
   }
+
 
   // RESTORE ADMIN OR PARENT SESSION WHEN WEBSITE OPENS
 
@@ -361,17 +362,19 @@ function App() {
             setLoggedInParentName('')
             setPage('Dashboard')
           }
-        } else if (profile.role === 'parent') {
-          const child = await loadParentStudent()
+       
+} else if (profile.role === 'parent') {
+  const children = await loadParentStudents()
 
-          if (mounted) {
-            setStudents([child])
-            setLoggedInStudentId(child.id)
-            setLoggedInParentName(profile.full_name || 'Parent')
-            setLoginRole('parent')
-            setPage('Parent Portal')
-          }
-        }
+  if (mounted) {
+    setStudents(children)
+    setLoggedInStudentId(children[0].id)
+    setLoggedInParentName(profile.full_name || 'Parent')
+    setLoginRole('parent')
+    setPage('Parent Portal')
+  }
+}
+
       } catch (error) {
         console.error('Session restoration error:', error)
 
@@ -509,14 +512,16 @@ function App() {
         setLoggedInStudentId(null)
         setLoggedInParentName('')
         setPage('Dashboard')
-      } else if (profile.role === 'parent') {
-        const child = await loadParentStudent()
-        setStudents([child])
-        setLoggedInStudentId(child.id)
-        setLoggedInParentName(profile.full_name || 'Parent')
-        setLoginRole('parent')
-        setPage('Parent Portal')
-      } else {
+      
+} else if (profile.role === 'parent') {
+  const children = await loadParentStudents()
+  setStudents(children)
+  setLoggedInStudentId(children[0].id)
+  setLoggedInParentName(profile.full_name || 'Parent')
+  setLoginRole('parent')
+  setPage('Parent Portal')
+}
+ else {
         throw new Error('This account does not have access.')
       }
 
@@ -1378,6 +1383,22 @@ function App() {
             </span>
           </div>
         </section>
+        {isParent && students.length > 1 && (
+  <section className="content-card">
+    <h2>👨‍👩‍👧 Select Child</h2>
+
+    <select
+      value={loggedInStudentId ?? ''}
+      onChange={e => setLoggedInStudentId(Number(e.target.value))}
+    >
+      {students.map(child => (
+        <option key={child.id} value={child.id}>
+          {child.name} ({child.studentClass})
+        </option>
+      ))}
+    </select>
+  </section>
+)}
 
         <section className="stats">
           <div className="stat-card blue">
