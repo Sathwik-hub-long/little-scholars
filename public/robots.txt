@@ -1,0 +1,5 @@
+
+User-agent: *
+Allow: /
+
+Sitemap: https://sathwik-hub-long.github.io/little-scholars/sitemap.xml
